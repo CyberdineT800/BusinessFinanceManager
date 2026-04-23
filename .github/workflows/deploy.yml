@@ -1,0 +1,53 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.IP }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            set -e
+            APP_DIR=/var/www/financemanager
+            VENV="$APP_DIR/venv/bin"
+
+            # Write .env from secrets
+            cat > "$APP_DIR/.env" << 'ENVEOF'
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GEMINI_MODEL=gemini-2.5-pro
+            CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+            TOKEN_EXPIRE_HOURS=24
+            DASHBOARD_USERNAME=${{ secrets.DASHBOARD_USERNAME }}
+            DASHBOARD_PASSWORD_HASH=${{ secrets.DASHBOARD_PASSWORD_HASH }}
+            ENVEOF
+
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+
+            "$VENV/pip" install -q -r backend/requirements.txt
+
+            cd "$APP_DIR/backend"
+            "$VENV/alembic" upgrade head
+
+            cd "$APP_DIR/frontend"
+            npm ci --silent
+            npm run build
+
+            systemctl restart financemanager
+            systemctl is-active --quiet financemanager || (journalctl -u financemanager -n 30 && exit 1)
+
+            echo "Deploy complete at $(date)"

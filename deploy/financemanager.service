@@ -1,0 +1,30 @@
+[Unit]
+Description=Business Finance Manager API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/financemanager/backend
+EnvironmentFile=/var/www/financemanager/.env
+RuntimeDirectory=financemanager
+RuntimeDirectoryMode=0755
+ExecStart=/var/www/financemanager/venv/bin/gunicorn \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --workers 2 \
+    --bind unix:/run/financemanager/api.sock \
+    --umask 007 \
+    --forwarded-allow-ips="*" \
+    --timeout 120 \
+    app.main:app
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -10,7 +10,7 @@ import Budgets from '@/pages/Budgets'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/financemanager">
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route

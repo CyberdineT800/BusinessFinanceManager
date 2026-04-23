@@ -58,7 +58,7 @@ jobs:
             # 4. Frontend build
             cd "$APP_DIR/frontend"
             npm ci --silent
-            npm run build --  --skipLibCheck || npx tsc --skipLibCheck && npx vite build
+            npm run build
 
             # 5. Restart service
             sudo systemctl restart financemanager

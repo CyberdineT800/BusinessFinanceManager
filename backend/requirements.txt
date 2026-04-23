@@ -13,3 +13,4 @@ python-dateutil==2.9.0.post0
 httpx==0.28.0
 PyJWT==2.9.0
 passlib[bcrypt]==1.7.4
+gunicorn==23.0.0

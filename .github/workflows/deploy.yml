@@ -14,23 +14,25 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
+          # Pass secrets as env vars into the SSH session
+          envs: DATABASE_URL,TELEGRAM_BOT_TOKEN,GEMINI_API_KEY,CORS_ORIGINS,SECRET_KEY,DASHBOARD_USERNAME,DASHBOARD_PASSWORD_HASH
           script: |
             set -e
             APP_DIR=/var/www/financemanager
             VENV_PYTHON="$APP_DIR/venv/bin/python"
 
-            # 1. Write .env from secrets
-            cat > "$APP_DIR/.env" << 'ENVEOF'
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-            GEMINI_MODEL=gemini-2.5-pro
-            CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
-            SECRET_KEY=${{ secrets.SECRET_KEY }}
-            TOKEN_EXPIRE_HOURS=24
-            DASHBOARD_USERNAME=${{ secrets.DASHBOARD_USERNAME }}
-            DASHBOARD_PASSWORD_HASH=${{ secrets.DASHBOARD_PASSWORD_HASH }}
-            ENVEOF
+            # 1. Write .env — use printf so env vars expand correctly
+            printf '%s\n' \
+              "DATABASE_URL=$DATABASE_URL" \
+              "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" \
+              "GEMINI_API_KEY=$GEMINI_API_KEY" \
+              "GEMINI_MODEL=gemini-2.5-pro" \
+              "CORS_ORIGINS=$CORS_ORIGINS" \
+              "SECRET_KEY=$SECRET_KEY" \
+              "TOKEN_EXPIRE_HOURS=24" \
+              "DASHBOARD_USERNAME=$DASHBOARD_USERNAME" \
+              "DASHBOARD_PASSWORD_HASH=$DASHBOARD_PASSWORD_HASH" \
+              > "$APP_DIR/.env"
 
             # 2. Update Code
             cd "$APP_DIR"
@@ -38,12 +40,10 @@ jobs:
             git reset --hard origin/main
 
             # 3. Install Backend Dependencies
-            # We use 'python -m pip' to ensure we hit the venv and avoid path conflicts
             "$VENV_PYTHON" -m pip install -U pip
             "$VENV_PYTHON" -m pip install -r backend/requirements.txt
 
             # 4. Database Migrations
-            # Using 'python -m alembic' prevents the 'ModuleNotFoundError'
             cd "$APP_DIR/backend"
             "$VENV_PYTHON" -m alembic upgrade head
 
@@ -57,3 +57,11 @@ jobs:
             sudo systemctl is-active --quiet financemanager || (journalctl -u financemanager -n 30 && exit 1)
 
             echo "Deploy complete at $(date)"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          DASHBOARD_USERNAME: ${{ secrets.DASHBOARD_USERNAME }}
+          DASHBOARD_PASSWORD_HASH: ${{ secrets.DASHBOARD_PASSWORD_HASH }}

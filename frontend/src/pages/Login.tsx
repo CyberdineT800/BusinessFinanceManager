@@ -17,7 +17,7 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const res = await axios.post('/api/v1/auth/login', { username, password })
+      const res = await axios.post('/financemanager/api/v1/auth/login', { username, password })
       setToken(res.data.access_token)
       navigate('/', { replace: true })
     } catch (err: any) {

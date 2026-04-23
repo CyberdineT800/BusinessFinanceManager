@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Upload release
+      - name: Upload code
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.IP }}
@@ -47,25 +47,20 @@ jobs:
               "DASHBOARD_PASSWORD_HASH=$DASHBOARD_PASSWORD_HASH" \
               > "$APP_DIR/.env"
 
-            # 2. Swap release in
-            rm -rf "$APP_DIR/backend" "$APP_DIR/frontend"
-            cp -a "$APP_DIR/release/." "$APP_DIR/"
-            rm -rf "$APP_DIR/release"
-
-            # 3. Install backend dependencies
+            # 2. Install backend dependencies
             "$VENV_PYTHON" -m pip install -U pip
             "$VENV_PYTHON" -m pip install -r "$APP_DIR/backend/requirements.txt"
 
-            # 4. Database migrations
+            # 3. Database migrations
             cd "$APP_DIR/backend"
             "$VENV_PYTHON" -m alembic upgrade head
 
-            # 5. Frontend build
+            # 4. Frontend build
             cd "$APP_DIR/frontend"
             npm ci --silent
             npm run build
 
-            # 6. Restart service
+            # 5. Restart service
             sudo systemctl restart financemanager
             sudo systemctl is-active --quiet financemanager || (journalctl -u financemanager -n 30 && exit 1)
 

@@ -7,21 +7,34 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - uses: actions/checkout@v4
+
+      - name: Upload release
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.IP }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          source: "."
+          target: "/var/www/financemanager"
+          exclude: ".git,__pycache__,*.pyc,.env,venv,node_modules"
+          overwrite: true
+
+      - name: Deploy & restart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.IP }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
-          # Pass secrets as env vars into the SSH session
           envs: DATABASE_URL,TELEGRAM_BOT_TOKEN,GEMINI_API_KEY,CORS_ORIGINS,SECRET_KEY,DASHBOARD_USERNAME,DASHBOARD_PASSWORD_HASH
           script: |
             set -e
             APP_DIR=/var/www/financemanager
             VENV_PYTHON="$APP_DIR/venv/bin/python"
 
-            # 1. Write .env — use printf so env vars expand correctly
+            # 1. Write .env
             printf '%s\n' \
               "DATABASE_URL=$DATABASE_URL" \
               "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" \
@@ -34,25 +47,25 @@ jobs:
               "DASHBOARD_PASSWORD_HASH=$DASHBOARD_PASSWORD_HASH" \
               > "$APP_DIR/.env"
 
-            # 2. Update Code
-            cd "$APP_DIR"
-            git fetch origin main
-            git reset --hard origin/main
+            # 2. Swap release in
+            rm -rf "$APP_DIR/backend" "$APP_DIR/frontend"
+            cp -a "$APP_DIR/release/." "$APP_DIR/"
+            rm -rf "$APP_DIR/release"
 
-            # 3. Install Backend Dependencies
+            # 3. Install backend dependencies
             "$VENV_PYTHON" -m pip install -U pip
-            "$VENV_PYTHON" -m pip install -r backend/requirements.txt
+            "$VENV_PYTHON" -m pip install -r "$APP_DIR/backend/requirements.txt"
 
-            # 4. Database Migrations
+            # 4. Database migrations
             cd "$APP_DIR/backend"
             "$VENV_PYTHON" -m alembic upgrade head
 
-            # 5. Frontend Build
+            # 5. Frontend build
             cd "$APP_DIR/frontend"
             npm ci --silent
             npm run build
 
-            # 6. Restart Service
+            # 6. Restart service
             sudo systemctl restart financemanager
             sudo systemctl is-active --quiet financemanager || (journalctl -u financemanager -n 30 && exit 1)
 

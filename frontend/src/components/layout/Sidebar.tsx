@@ -57,7 +57,7 @@ export default function Sidebar() {
 
       <div className="p-3 border-t border-sidebar-border space-y-0.5">
         <a
-          href="https://t.me/"
+          href="https://t.me/business_finance_manager_ai_bot"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-sidebar-hover transition-all"

@@ -1,5 +1,4 @@
 name: Deploy to Production
-
 on:
   push:
     branches: [main]
@@ -7,7 +6,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -19,9 +17,9 @@ jobs:
           script: |
             set -e
             APP_DIR=/var/www/financemanager
-            VENV="$APP_DIR/venv/bin"
+            VENV_PYTHON="$APP_DIR/venv/bin/python"
 
-            # Write .env from secrets
+            # 1. Write .env from secrets
             cat > "$APP_DIR/.env" << 'ENVEOF'
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -34,20 +32,28 @@ jobs:
             DASHBOARD_PASSWORD_HASH=${{ secrets.DASHBOARD_PASSWORD_HASH }}
             ENVEOF
 
+            # 2. Update Code
             cd "$APP_DIR"
             git fetch origin main
             git reset --hard origin/main
 
-            "$VENV/pip" install -q -r backend/requirements.txt
+            # 3. Install Backend Dependencies
+            # We use 'python -m pip' to ensure we hit the venv and avoid path conflicts
+            "$VENV_PYTHON" -m pip install -U pip
+            "$VENV_PYTHON" -m pip install -r backend/requirements.txt
 
+            # 4. Database Migrations
+            # Using 'python -m alembic' prevents the 'ModuleNotFoundError'
             cd "$APP_DIR/backend"
-            "$VENV/alembic" upgrade head
+            "$VENV_PYTHON" -m alembic upgrade head
 
+            # 5. Frontend Build
             cd "$APP_DIR/frontend"
             npm ci --silent
             npm run build
 
-            systemctl restart financemanager
-            systemctl is-active --quiet financemanager || (journalctl -u financemanager -n 30 && exit 1)
+            # 6. Restart Service
+            sudo systemctl restart financemanager
+            sudo systemctl is-active --quiet financemanager || (journalctl -u financemanager -n 30 && exit 1)
 
             echo "Deploy complete at $(date)"
